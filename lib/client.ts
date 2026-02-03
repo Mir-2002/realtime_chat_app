@@ -1,6 +1,6 @@
 import { treaty } from "@elysiajs/eden";
 import type { App } from "@/app/api/[[...slugs]]/route";
 
-// Use same-origin in production (Vercel) and in dev.
-// Hard-coding localhost breaks when deployed.
-export const client = treaty<App>("").api;
+const baseUrl = typeof window === "undefined" ? "" : window.location.origin;
+
+export const client = treaty<App>(baseUrl).api;
