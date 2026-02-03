@@ -3,7 +3,7 @@ import { client } from "@/lib/client";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUsername } from "./api/hooks/use-username";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 
 const Page = () => {
   return (
@@ -20,14 +20,32 @@ function Lobby() {
   const wasDestroyed = searchParams.get("destroyed") === "true";
   const error = searchParams.get("error");
 
+  const [createError, setCreateError] = useState<string | null>(null);
+
   const router = useRouter();
-  const { mutate: createRoom } = useMutation({
+  const { mutate: createRoom, isPending } = useMutation({
     mutationFn: async () => {
+      setCreateError(null);
+
       const res = await client.room.create.post();
 
-      if (res.status === 200) {
-        router.push(`/room/${res.data?.roomId}`);
+      if (res.status !== 200) {
+        throw new Error(
+          (res as any)?.error?.value?.message ?? "Failed to create room"
+        );
       }
+
+      const roomId = res.data?.roomId;
+      if (!roomId) throw new Error("No roomId returned from server");
+
+      router.push(`/room/${roomId}`);
+    },
+    onError: (err) => {
+      const message =
+        err instanceof Error ? err.message : "Failed to create room";
+      setCreateError(message);
+      // Keep a dev-friendly breadcrumb too.
+      console.error(err);
     },
   });
   return (
@@ -57,6 +75,16 @@ function Lobby() {
             </p>
           </div>
         )}
+        {createError && (
+          <div className="bg-red-950/50 border border-red-900 p-4 text-center">
+            <p className="text-red-500 text-sm font-bold">
+              COULDN'T CREATE ROOM
+            </p>
+            <p className="text-zinc-500 text-xs mt-1 wrap-break-word">
+              {createError}
+            </p>
+          </div>
+        )}
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold tracking-tight text-green-500">
             {">"}private_chat
@@ -79,9 +107,10 @@ function Lobby() {
             </div>
             <button
               onClick={() => createRoom()}
+              disabled={isPending}
               className="w-full bg-zinc-100 text-black p-3 text-sm font-bold hover:bg-zinc-50 hover:text-black transition-colors mt-2 cursor-pointer disabled:opacity-50"
             >
-              CREATE SECURE ROOM
+              {isPending ? "CREATING..." : "CREATE SECURE ROOM"}
             </button>
           </div>
         </div>
